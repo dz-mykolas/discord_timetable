@@ -27,7 +27,11 @@ pub fn build_courses_table(courses: Vec<Course>) -> String {
     String::from("```ansi\n") + &table.to_string() + "```"
 }
 
-pub fn calculate_range(current_page: usize, per_page: usize, total: usize) -> std::ops::Range<usize> {
+pub fn calculate_range(
+    current_page: usize,
+    per_page: usize,
+    total: usize,
+) -> std::ops::Range<usize> {
     let start = (current_page - 1) * per_page;
     let end = if start + per_page > total {
         total

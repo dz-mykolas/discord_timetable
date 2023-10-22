@@ -1,4 +1,6 @@
-use sqlx::{Result, SqlitePool, pool};
+#![allow(dead_code)]
+
+use sqlx::{Result, SqlitePool};
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct Course {
@@ -80,16 +82,23 @@ pub async fn get_all_assessments(pool: &SqlitePool) -> Result<Vec<Assessment>, s
     Ok(assessments)
 }
 
-pub async fn get_course_assessments(pool: &SqlitePool, fk_course_id: i32) -> Result<Vec<Assessment>, sqlx::Error> {
-    let assessments = sqlx::query_as::<_, Assessment>("SELECT * FROM assessments WHERE fk_course_id = ?")
-        .bind(fk_course_id)
-        .fetch_all(pool)
-        .await?;
+pub async fn get_course_assessments(
+    pool: &SqlitePool,
+    fk_course_id: i32,
+) -> Result<Vec<Assessment>, sqlx::Error> {
+    let assessments =
+        sqlx::query_as::<_, Assessment>("SELECT * FROM assessments WHERE fk_course_id = ?")
+            .bind(fk_course_id)
+            .fetch_all(pool)
+            .await?;
 
     Ok(assessments)
 }
 
-pub async fn insert_assessment(pool: &SqlitePool, assessment: &Assessment) -> Result<u64, sqlx::Error> {
+pub async fn insert_assessment(
+    pool: &SqlitePool,
+    assessment: &Assessment,
+) -> Result<u64, sqlx::Error> {
     let rows_affected = sqlx::query!(
         r#"
         INSERT INTO assessments (name, weight, take1, retake1, retake2, fk_course_id)
@@ -108,7 +117,10 @@ pub async fn insert_assessment(pool: &SqlitePool, assessment: &Assessment) -> Re
     Ok(rows_affected.rows_affected())
 }
 
-pub async fn delete_assessment(pool: &SqlitePool, id: i32) -> Result<Option<Assessment>, sqlx::Error> {
+pub async fn delete_assessment(
+    pool: &SqlitePool,
+    id: i32,
+) -> Result<Option<Assessment>, sqlx::Error> {
     let assessment: Option<Assessment> = sqlx::query_as!(
         Assessment,
         r#"
@@ -123,7 +135,6 @@ pub async fn delete_assessment(pool: &SqlitePool, id: i32) -> Result<Option<Asse
 
     Ok(assessment)
 }
-
 
 /* UNUSED FUNCTIONS */
 
@@ -146,7 +157,6 @@ pub async fn delete_assessment(pool: &SqlitePool, id: i32) -> Result<Option<Asse
 //     Ok(())
 // }
 
-
 // async fn create_table_assessment(pool: &SqlitePool) -> Result<()> {
 //     sqlx::query(
 //         r#"
@@ -167,7 +177,6 @@ pub async fn delete_assessment(pool: &SqlitePool, id: i32) -> Result<Option<Asse
 
 //     Ok(())
 // }
-
 
 // async fn insert_courses(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 //     let course1 = Course {

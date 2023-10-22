@@ -1,5 +1,4 @@
-use poise::{serenity_prelude as serenity, CreateReply};
-use ::serenity::collector::component_interaction_collector;
+use poise::serenity_prelude as serenity;
 
 use std::result::Result;
 
@@ -45,7 +44,7 @@ pub async fn write_table(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn courses(ctx: Context<'_>) -> Result<(), Error> {
     let pool = database_utils::establish_connection().await?;
     let courses = database_utils::get_all_courses(&pool).await?;
-    
+
     let response = utils::build_courses_table(courses);
 
     ctx.say(response).await?;
@@ -152,11 +151,9 @@ pub async fn insert_assessment(
     #[max_length = 12]
     take1: String,
 
-    #[description = "Date of the retake. Format: YYYY-MM-DD"]
-    retake1: String,
+    #[description = "Date of the retake. Format: YYYY-MM-DD"] retake1: String,
 
-    #[description = "Date of the retake. Format: YYYY-MM-DD"]
-    retake2: String,
+    #[description = "Date of the retake. Format: YYYY-MM-DD"] retake2: String,
 
     #[description = "Course ID"]
     #[min = 0]
