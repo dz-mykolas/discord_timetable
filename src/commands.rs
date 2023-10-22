@@ -250,7 +250,8 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
         return Ok(());
     }
 
-    let courses_table = utils::build_courses_table(courses[(page - 1) * courses_per_page..page * courses_per_page].to_vec());
+    let range = utils::calculate_range(page, courses_per_page, courses.len());
+    let courses_table = utils::build_courses_table(courses[range].to_vec());
 
     let previous_button = CreateButton::default()
         .style(ButtonStyle::Primary)
