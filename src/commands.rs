@@ -232,8 +232,12 @@ pub async fn remove_assessment(ctx: Context<'_>, id: i32) -> Result<(), Error> {
 }
 
 use serenity::builder::CreateButton;
+use serenity::futures::StreamExt;
 use serenity::model::application::component::ButtonStyle;
-use ::serenity::futures::StreamExt;
+use serenity::model::application::interaction::{
+    InteractionResponseType,
+    MessageFlags
+};
 use std::time::Duration;
 
 #[poise::command(slash_command)]
@@ -241,7 +245,7 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
     let connection = database_utils::establish_connection().await?;
     let courses = database_utils::get_all_courses(&connection).await?;
 
-    let page = page.unwrap_or(1);
+    let mut page = page.unwrap_or(1);
     let courses_per_page = 5;
 
     if page > (courses.len() / courses_per_page) + 1 {
@@ -253,52 +257,123 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
     let range = utils::calculate_range(page, courses_per_page, courses.len());
     let courses_table = utils::build_courses_table(courses[range].to_vec());
 
+    let content = match courses.len() <= courses_per_page {
+        true => format!("# Courses list\n{}", courses_table),
+        false => format!(
+            "# Courses list (Page {}/{})\n{}",
+            page,
+            (courses.len() / courses_per_page) + 1,
+            courses_table
+        ),
+    };
+
+    if courses.len() <= courses_per_page {
+        ctx.say(content).await?;
+        return Ok(());
+    }
+
     let previous_button = CreateButton::default()
         .style(ButtonStyle::Primary)
         .label("Previous")
         .custom_id("previous_page")
-        .disabled(true)
-        .clone();
+        .disabled(page == 1)
+        .to_owned();
 
     let next_button = CreateButton::default()
-        .label("Next")
         .style(ButtonStyle::Primary)
+        .label("Next")
         .custom_id("next_page")
-        .disabled(true)
-        .clone();
+        .disabled(false)
+        .to_owned();
 
-    let content = match courses.len() <= courses_per_page {
-        true => format!("# Courses list\n{}", courses_table),
-        false => format!("# Courses list (Page {}/{})\n{}", page, (courses.len() / courses_per_page) + 1, courses_table),
-    };
-
-    let response: poise::ReplyHandle<'_> = ctx.send(|m| {
-        m.content(content).components(|c| {
-            c.create_action_row(|row| {
-                row.add_button(previous_button)
-                    .add_button(next_button)
+    let response: poise::ReplyHandle<'_> = ctx
+        .send(|m| {
+            m.content(content).components(|c| {
+                c.create_action_row(|row| {
+                    row.add_button(previous_button.clone())
+                        .add_button(next_button.clone())
+                })
             })
         })
-    }).await?;
+        .await?;
 
-    
     let m = response.message().await?;
-    
+
     // Wait for multiple interactions
-    let mut interaction_stream =
-            m.await_component_interactions(&ctx).timeout(Duration::from_secs(10 * 2)).build();
+    let mut interaction_stream = m
+        .await_component_interactions(&ctx)
+        .timeout(Duration::from_secs(10 * 2))
+        .build();
 
     while let Some(interaction) = interaction_stream.next().await {
+        if interaction.user.id != ctx.author().id {
+            interaction
+                .create_interaction_response(&ctx, |r| {
+                    r.kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|d| {
+                            d.content("This is not your interaction!")
+                                .flags(MessageFlags::EPHEMERAL)
+                        })
+                })
+                .await?;
+
+            continue;
+        }
+
         let custom_id = interaction.data.custom_id.as_str();
-        interaction.create_interaction_response(&ctx, |r| {
-            r.kind(serenity::model::application::interaction::InteractionResponseType::DeferredUpdateMessage)
-            .interaction_response_data(|d| d.content(custom_id))
-        }).await?;
+        let new_page = match custom_id {
+            "previous_page" => page - 1,
+            "next_page" => page + 1,
+            _ => page,
+        };
+        page = new_page;
+        let total_pages = (courses.len() / courses_per_page) + 1;
+        if new_page > total_pages {
+            continue;
+        }
+
+        let range = utils::calculate_range(new_page, courses_per_page, courses.len());
+        let courses_table = utils::build_courses_table(courses[range].to_vec());
+
+        let content = match courses.len() <= courses_per_page {
+            true => format!("# Courses list\n{}", courses_table),
+            false => format!(
+                "# Courses list (Page {}/{})\n{}",
+                new_page, total_pages, courses_table
+            ),
+        };
+
+        let mut previous_button = previous_button.clone();
+        let mut next_button = next_button.clone();
+
+        if new_page > 1 {
+            previous_button.disabled(false);
+        } else {
+            previous_button.disabled(true);
+        }
+
+        if new_page < total_pages {
+            next_button.disabled(false);
+        } else {
+            next_button.disabled(true);
+        }
+
+        interaction
+            .create_interaction_response(&ctx, |r| {
+                r.kind(InteractionResponseType::UpdateMessage)
+                    .interaction_response_data(|d| {
+                        d.content(content).components(|c| {
+                            c.create_action_row(|row| {
+                                row.add_button(previous_button.clone())
+                                    .add_button(next_button.clone())
+                            })
+                        })
+                    })
+            })
+            .await?;
     }
 
-    response.edit(ctx, |m| {
-        m.components(|c| c)
-    }).await?;
+    response.edit(ctx, |m| m.components(|c| c)).await?;
 
     Ok(())
 }
