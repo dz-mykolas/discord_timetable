@@ -16,5 +16,10 @@ To be updated...
   - [ ] Pages listing
   - [ ] Manage
   - [ ] Authorization
-- [ ] Build scripts
-  - [ ] Quick setup database
+  - [ ] Color due dates accordingly
+  - [ ] Auto-update in set channels
+
+### Might consider
+- [ ] Scripts
+  - [ ] Setup database
+  - [ ] Setup permissions
