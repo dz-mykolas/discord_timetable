@@ -1,5 +1,5 @@
 # Timetable Bot
-Discord bot that allows displaying/managing of university timetables.
+Discord bot written in pure rust that allows displaying/managing of university timetables.
 
 ### Essential
 - [ ] Courses
