@@ -4,6 +4,7 @@ Discord bot written in pure rust that allows displaying/managing of university t
 # Quickstart
 To be updated...
 
+# Task list
 ### Essential
 - [ ] Courses
   - [x] View
