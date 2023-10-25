@@ -6,7 +6,9 @@ mod database_utils;
 mod utils;
 
 use crate::commands::Data;
-use crate::commands::{age, courses, insert_course, list_courses, remove_course, write_table};
+use crate::commands::{
+    insert_course, list_assessments, list_courses, remove_course, insert_assessment, remove_assessment,
+};
 
 #[tokio::main]
 async fn main() {
@@ -16,12 +18,12 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
-                age(),
-                write_table(),
-                courses(),
                 insert_course(),
                 remove_course(),
                 list_courses(),
+                list_assessments(),
+                insert_assessment(),
+                remove_assessment(),
             ],
             ..Default::default()
         })

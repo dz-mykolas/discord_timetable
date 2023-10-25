@@ -12,7 +12,7 @@ pub struct Course {
     pub credit: f64,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct Assessment {
     pub id: i64,
     pub name: String,

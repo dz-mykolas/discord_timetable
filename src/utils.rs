@@ -1,8 +1,10 @@
+use chrono::{NaiveDate, Utc};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::*;
+use comfy_table::Cell;
 
-use crate::database_utils::Course;
+use crate::database_utils::{Assessment, Course};
 
 pub fn build_courses_table(courses: Vec<Course>) -> String {
     let mut table = Table::new();
@@ -27,6 +29,43 @@ pub fn build_courses_table(courses: Vec<Course>) -> String {
     String::from("```ansi\n") + &table.to_string() + "```"
 }
 
+pub fn build_assessments_table(assessments: Vec<Assessment>) -> String {
+    let mut table = Table::new();
+
+    table
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_width(100)
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(vec![
+            "ID",
+            "Name",
+            "Take 1",
+            "Retake 1",
+            "Retake 2",
+            "Weight",
+            "Course ID",
+        ]);
+
+    for assessment in assessments {
+        let take1 = add_date_color(assessment.take1.clone());
+        let retake1 = add_date_color(assessment.retake1.clone());
+        let retake2 = add_date_color(assessment.retake2.clone());
+
+        table.add_row(vec![
+            Cell::new(&assessment.id.to_string()),
+            Cell::new(&assessment.name),
+            Cell::new(&take1),
+            Cell::new(&retake1),
+            Cell::new(&retake2),
+            Cell::new(&assessment.weight.to_string()),
+            Cell::new(&assessment.fk_course_id.to_string()),
+        ]);
+    }
+
+    String::from("```ansi\n") + &table.to_string() + "```"
+}
+
 pub fn calculate_range(
     current_page: usize,
     per_page: usize,
@@ -40,4 +79,30 @@ pub fn calculate_range(
     };
 
     start..end
+}
+
+fn add_date_color(date: String) -> String {
+    let _today = Utc::now().naive_utc().date();
+    let _date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
+
+    let result = date;
+    // Does not work because of ComfyTable and Discord formatting
+    // let result = if date < today {
+    //     format!("{}{}{}", "\u{001b}[31m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    // } else if date <= today + chrono::Duration::days(7) {
+    //     format!("{}{}{}", "\u{001b}[33m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    // } else {
+    //     format!("{}{}{}", "\u{001b}[32m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    // };
+
+    // Emojis do not work in as well because of different sized characters
+    // let result = if date < today {
+    //     format!("{}❌", date.format("%Y-%m-%d").to_string())
+    // } else if date <= today + chrono::Duration::days(7) {
+    //     format!("{}⏳", date.format("%Y-%m-%d").to_string())
+    // } else {
+    //     format!("{}🟢", date.format("%Y-%m-%d").to_string())
+    // };
+    
+    result
 }

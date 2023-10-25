@@ -7,67 +7,17 @@ use chrono::NaiveDate;
 use crate::database_utils;
 use crate::utils;
 
+use serenity::builder::CreateButton;
+use serenity::futures::StreamExt;
+use serenity::model::application::component::ButtonStyle;
+use serenity::model::application::interaction::{InteractionResponseType, MessageFlags};
+use std::time::Duration;
+
 pub struct Data {} // User data, which is stored and accessible in all command invocations
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-#[poise::command(slash_command, prefix_command)]
-pub async fn write_table(ctx: Context<'_>) -> Result<(), Error> {
-    let _pool = database_utils::establish_connection().await?;
-
-    // stop execution for 1sec
-    std::thread::sleep(std::time::Duration::from_secs(1));
-
-    let take1 = "\u{001b}[0;31m2021-01-01\u{001b}[0;0m";
-    let retake1 = "\u{001b}[0;32m2021-01-02\u{001b}[0;0m";
-    let retake2 = "\u{001b}[0;32m2021-01-03\u{001b}[0;0m";
-
-    let mut table = String::new();
-    table.push_str("# Test hehe\n");
-    table.push_str("```ansi\n");
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str("| Type   | Take 1     | Retake 1   | Retake 2   |\n");
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str(&format!(
-        "| Lab 0  | {:<10} | {:<10} | {:<10} |\n",
-        take1, retake1, retake2
-    ));
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str("```");
-
-    let response = table;
-    ctx.say(response).await?;
-    Ok(())
-}
-
-#[poise::command(slash_command, prefix_command)]
-pub async fn courses(ctx: Context<'_>) -> Result<(), Error> {
-    let pool = database_utils::establish_connection().await?;
-    let courses = database_utils::get_all_courses(&pool).await?;
-
-    let response = utils::build_courses_table(courses);
-
-    ctx.say(response).await?;
-    Ok(())
-}
-
-/// Displays your or another user's account creation date
-#[poise::command(slash_command, prefix_command)]
-pub async fn age(
-    ctx: Context<'_>,
-    #[description = "Selected user"] user: Option<serenity::User>,
-) -> Result<(), Error> {
-    let u = user.as_ref().unwrap_or_else(|| ctx.author());
-    let response = format!(
-        "```ansi\n\u{001b}[0;31m{}'s\u{001b}[0;0m account was created at {}```",
-        u.name,
-        u.created_at()
-    );
-    ctx.say(response).await?;
-    Ok(())
-}
-
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn insert_course(
     ctx: Context<'_>,
 
@@ -113,7 +63,7 @@ pub async fn insert_course(
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn remove_course(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     let pool = database_utils::establish_connection().await?;
     let course = database_utils::delete_course(&pool, id).await?;
@@ -132,7 +82,7 @@ pub async fn remove_course(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn insert_assessment(
     ctx: Context<'_>,
 
@@ -206,7 +156,7 @@ pub async fn insert_assessment(
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn remove_assessment(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     let pool = database_utils::establish_connection().await?;
     let assessment = database_utils::delete_assessment(&pool, id).await?;
@@ -228,16 +178,11 @@ pub async fn remove_assessment(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     Ok(())
 }
 
-use serenity::builder::CreateButton;
-use serenity::futures::StreamExt;
-use serenity::model::application::component::ButtonStyle;
-use serenity::model::application::interaction::{
-    InteractionResponseType,
-    MessageFlags
-};
-use std::time::Duration;
-
-#[poise::command(slash_command)]
+#[poise::command(
+    slash_command,
+    default_member_permissions = "SEND_MESSAGES",
+    user_cooldown = "30"
+)]
 pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), Error> {
     let connection = database_utils::establish_connection().await?;
     let courses = database_utils::get_all_courses(&connection).await?;
@@ -371,6 +316,45 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
     }
 
     response.edit(ctx, |m| m.components(|c| c)).await?;
+
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    default_member_permissions = "SEND_MESSAGES",
+    user_cooldown = "30"
+)]
+pub async fn list_assessments(ctx: Context<'_>, course_id: i32, page: Option<usize>) -> Result<(), Error> {
+    let connection = database_utils::establish_connection().await?;
+    let assessments = database_utils::get_course_assessments(&connection, course_id).await?;
+
+    let mut page = page.unwrap_or(1);
+    let assessments_per_page = 5;
+
+    if page > (assessments.len() / assessments_per_page) + 1 {
+        let response = format!("Page {} does not exist", page);
+        ctx.say(response).await?;
+        return Ok(());
+    }
+
+    let range = utils::calculate_range(page, assessments_per_page, assessments.len());
+    let assessments_table = utils::build_assessments_table(assessments[range].to_vec());
+
+    let content = match assessments.len() <= assessments_per_page {
+        true => format!("# Assessments list\n{}", assessments_table),
+        false => format!(
+            "# Assessments list (Page {}/{})\n{}",
+            page,
+            (assessments.len() / assessments_per_page) + 1,
+            assessments_table
+        ),
+    };
+
+    if assessments.len() <= assessments_per_page {
+        ctx.say(content).await?;
+        return Ok(());
+    }
 
     Ok(())
 }
