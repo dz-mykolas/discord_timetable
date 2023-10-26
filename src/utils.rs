@@ -51,6 +51,7 @@ pub fn build_assessments_table(assessments: Vec<Assessment>) -> String {
         let take1 = add_date_color(assessment.take1.clone());
         let retake1 = add_date_color(assessment.retake1.clone());
         let retake2 = add_date_color(assessment.retake2.clone());
+        // let take1 = console::style(assessment.take1.clone()).red();
 
         table.add_row(vec![
             Cell::new(&assessment.id.to_string()),
@@ -82,27 +83,16 @@ pub fn calculate_range(
 }
 
 fn add_date_color(date: String) -> String {
-    let _today = Utc::now().naive_utc().date();
-    let _date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
+    let today = Utc::now().naive_utc().date();
+    let date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
 
-    let result = date;
-    // Does not work because of ComfyTable and Discord formatting
-    // let result = if date < today {
-    //     format!("{}{}{}", "\u{001b}[31m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
-    // } else if date <= today + chrono::Duration::days(7) {
-    //     format!("{}{}{}", "\u{001b}[33m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
-    // } else {
-    //     format!("{}{}{}", "\u{001b}[32m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
-    // };
-
-    // Emojis do not work in as well because of different sized characters
-    // let result = if date < today {
-    //     format!("{}❌", date.format("%Y-%m-%d").to_string())
-    // } else if date <= today + chrono::Duration::days(7) {
-    //     format!("{}⏳", date.format("%Y-%m-%d").to_string())
-    // } else {
-    //     format!("{}🟢", date.format("%Y-%m-%d").to_string())
-    // };
+    let result = if date < today {
+        format!("{}{}{}", "\u{001b}[31m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    } else if date <= today + chrono::Duration::days(7) {
+        format!("{}{}{}", "\u{001b}[33m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    } else {
+        format!("{}{}{}", "\u{001b}[32m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+    };
     
     result
 }
