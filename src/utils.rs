@@ -1,10 +1,14 @@
 use chrono::{NaiveDate, Utc};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
-use comfy_table::*;
 use comfy_table::Cell;
+use comfy_table::*;
+use serenity::{builder::CreateButton, model::application::component::ButtonStyle};
 
 use crate::database_utils::{Assessment, Course};
+
+pub static COURSES_PER_PAGE: usize = 5;
+pub static ASSESSMENTS_PER_PAGE: usize = 5;
 
 pub fn build_courses_table(courses: Vec<Course>) -> String {
     let mut table = Table::new();
@@ -87,12 +91,54 @@ fn add_date_color(date: String) -> String {
     let date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
 
     let result = if date < today {
-        format!("{}{}{}", "\u{001b}[31m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+        format!(
+            "{}{}{}",
+            "\u{001b}[31m",
+            date.format("%Y-%m-%d").to_string(),
+            "\u{001b}[0m"
+        )
     } else if date <= today + chrono::Duration::days(7) {
-        format!("{}{}{}", "\u{001b}[33m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+        format!(
+            "{}{}{}",
+            "\u{001b}[33m",
+            date.format("%Y-%m-%d").to_string(),
+            "\u{001b}[0m"
+        )
     } else {
-        format!("{}{}{}", "\u{001b}[32m", date.format("%Y-%m-%d").to_string(), "\u{001b}[0m")
+        format!(
+            "{}{}{}",
+            "\u{001b}[32m",
+            date.format("%Y-%m-%d").to_string(),
+            "\u{001b}[0m"
+        )
     };
-    
+
     result
+}
+
+pub fn create_buttons(page_num: usize, quotient: usize) -> (CreateButton, CreateButton) {
+    let mut previous_button = CreateButton::default()
+        .style(ButtonStyle::Primary)
+        .label("Previous")
+        .custom_id(format!("previous_page;{page_num}"))
+        .to_owned();
+
+    let mut next_button = CreateButton::default()
+        .style(ButtonStyle::Primary)
+        .label("Next")
+        .custom_id(format!("next_page;{page_num}"))
+        .to_owned();
+
+    if page_num == 1 {
+        previous_button.disabled(true);
+        next_button.disabled(false);
+    } else if page_num == quotient + 1 {
+        previous_button.disabled(false);
+        next_button.disabled(true);
+    } else {
+        previous_button.disabled(false);
+        next_button.disabled(false);
+    }
+
+    (previous_button, next_button)
 }

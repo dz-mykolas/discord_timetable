@@ -59,6 +59,17 @@ pub async fn insert_course(pool: &SqlitePool, course: &Course) -> Result<u64, sq
 }
 
 pub async fn delete_course(pool: &SqlitePool, id: i32) -> Result<Option<Course>, sqlx::Error> {
+    // Delete all assessments associated with the course
+    sqlx::query!(
+        r#"
+        DELETE FROM assessments
+        WHERE fk_course_id = ?
+        "#,
+        id
+    )
+    .execute(pool)
+    .await?;
+
     let course: Option<Course> = sqlx::query_as!(
         Course,
         r#"
