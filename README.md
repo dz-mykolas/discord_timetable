@@ -1,6 +1,34 @@
 # Timetable Bot
 Discord bot written in pure rust that allows displaying/managing of university timetables.
 
+# Important
+Removed courses.db file in latest commit. So if needed create your own for now:
+## Tables:
+### Courses:
+```sql
+CREATE TABLE courses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    semester INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    credit REAL NOT NULL
+);
+```
+### Assessments
+```sql
+CREATE TABLE assessments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    weight REAL NOT NULL,
+    take1 TEXT NOT NULL,
+    retake1 TEXT NOT NULL,
+    retake2 TEXT NOT NULL,
+    fk_course_id INTEGER NOT NULL,
+    FOREIGN KEY (fk_course_id) REFERENCES courses(id)
+);
+```
+
 # Quickstart
 To be updated...
 
@@ -10,13 +38,13 @@ To be updated...
   - [x] View
   - [x] Pages listing
   - [ ] Manage
-  - [ ] Authorization
+  - [x] Authorization
 - [ ] Assessments
-  - [ ] View
-  - [ ] Pages listing
+  - [x] View
+  - [x] Pages listing
   - [ ] Manage
-  - [ ] Authorization
-  - [ ] Color due dates accordingly
+  - [x] Authorization
+  - [x] Color due dates accordingly
   - [ ] Auto-update in set channels
 
 ### Might consider

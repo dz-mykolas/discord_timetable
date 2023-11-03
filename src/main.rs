@@ -14,9 +14,7 @@ use crate::commands::{
     remove_course,
 };
 
-use std::sync::atomic::{AtomicU32, Ordering};
 type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[tokio::main]
 async fn main() {
@@ -55,7 +53,7 @@ async fn event_handler(
     ctx: &serenity::Context,
     event: &Event<'_>,
     _framework: poise::FrameworkContext<'_, Data, Error>,
-    data: &Data,
+    _data: &Data,
 ) -> Result<(), Error> {
     match event {
         Event::InteractionCreate { interaction, .. } => {
@@ -69,6 +67,8 @@ async fn event_handler(
                     Some(interaction) => interaction.name,
                     None => "".to_string(),
                 };
+
+                println!("Command: {}", command);
 
                 match command.as_str() {
                     "list_courses" => {

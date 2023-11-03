@@ -3,12 +3,16 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Cell;
 use comfy_table::*;
-use serenity::{builder::CreateButton, model::application::component::ButtonStyle};
+use serenity::{
+    builder::{CreateActionRow, CreateButton},
+    model::application::component::ButtonStyle,
+};
 
 use crate::database_utils::{Assessment, Course};
 
+// Discord API limits to 2000 characters per message
 pub static COURSES_PER_PAGE: usize = 5;
-pub static ASSESSMENTS_PER_PAGE: usize = 5;
+pub static ASSESSMENTS_PER_PAGE: usize = 9;
 
 pub fn build_courses_table(courses: Vec<Course>) -> String {
     let mut table = Table::new();
@@ -88,16 +92,26 @@ pub fn calculate_range(
 
 fn add_date_color(date: String) -> String {
     let today = Utc::now().naive_utc().date();
-    let date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap();
+    let date = match NaiveDate::parse_from_str(&date, "%Y-%m-%d") {
+        Ok(date) => date,
+        Err(_) => return date,
+    };
 
     let result = if date < today {
+        format!(
+            "{}{}{}",
+            "\u{001b}[30m",
+            date.format("%Y-%m-%d").to_string(),
+            "\u{001b}[0m"
+        )
+    } else if date <= today + chrono::Duration::days(7) {
         format!(
             "{}{}{}",
             "\u{001b}[31m",
             date.format("%Y-%m-%d").to_string(),
             "\u{001b}[0m"
         )
-    } else if date <= today + chrono::Duration::days(7) {
+    } else if date <= today + chrono::Duration::days(14) {
         format!(
             "{}{}{}",
             "\u{001b}[33m",
@@ -141,4 +155,74 @@ pub fn create_buttons(page_num: usize, quotient: usize) -> (CreateButton, Create
     }
 
     (previous_button, next_button)
+}
+
+pub fn format_assessment_response(
+    assessments: &Vec<Assessment>,
+    page: usize,
+    course_name: &String,
+) -> Result<String, String> {
+    let range = calculate_range(page, ASSESSMENTS_PER_PAGE, assessments.len());
+    let assessments_table = build_assessments_table(assessments[range].to_vec());
+
+    let content = match assessments.len() <= ASSESSMENTS_PER_PAGE {
+        true => format!("# {}\n{}", course_name, assessments_table),
+        false => format!(
+            "# Assessments list (Page {}/{})\n{}",
+            page,
+            (assessments.len() / ASSESSMENTS_PER_PAGE) + 1,
+            assessments_table
+        ),
+    };
+
+    Ok(content)
+}
+
+pub fn format_course_response(courses: &Vec<Course>, page: usize) -> Result<String, String> {
+    let range = calculate_range(page, COURSES_PER_PAGE, courses.len());
+    let courses_table = build_courses_table(courses[range].to_vec());
+
+    let content = match courses.len() <= COURSES_PER_PAGE {
+        true => format!("# Courses list\n{}", courses_table),
+        false => format!(
+            "# Courses list (Page {}/{})\n{}",
+            page,
+            (courses.len() / COURSES_PER_PAGE) + 1,
+            courses_table
+        ),
+    };
+
+    Ok(content)
+}
+
+pub fn create_courses_select_menu(
+    courses: &Vec<Course>,
+    current_course_id: i64,
+) -> Result<CreateActionRow, CreateActionRow> {
+    let current_course_name = match courses.iter().find(|course| course.id == current_course_id) {
+        Some(course) => course.name.clone(),
+        None => "No course selected".to_string(),
+    };
+
+    let action_row = CreateActionRow::default()
+        .create_select_menu(|menu| {
+            menu.custom_id(format!("select_course;{current_course_id}"));
+            menu.placeholder(&current_course_name);
+            menu.options(|f| {
+                for course in courses {
+                    f.create_option(|o| {
+                        o.label(&course.name);
+                        o.value(course.id.to_string());
+                        o
+                    });
+                }
+                f
+            })
+        })
+        .to_owned();
+
+    if &current_course_name == "No course selected" {
+        return Err(action_row);
+    }
+    Ok(action_row)
 }

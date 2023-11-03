@@ -1,20 +1,9 @@
-use poise::serenity_prelude as serenity;
-use poise::ReplyHandle;
-use serenity::model::application::interaction::message_component::MessageComponentInteraction;
-
 use std::result::Result;
-use std::sync::Arc;
 
 use chrono::NaiveDate;
 
 use crate::database_utils;
 use crate::utils;
-
-use serenity::builder::CreateButton;
-use serenity::futures::StreamExt;
-use serenity::model::application::component::ButtonStyle;
-use serenity::model::application::interaction::{InteractionResponseType, MessageFlags};
-use std::time::Duration;
 
 pub struct Data {} // User data, which is stored and accessible in all command invocations
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -118,27 +107,24 @@ pub async fn insert_assessment(
     match NaiveDate::parse_from_str(&take1, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", take1);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of take1: {}", take1);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
     match NaiveDate::parse_from_str(&retake1, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", retake1);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of retake1: {}", retake1);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
     match NaiveDate::parse_from_str(&retake2, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", retake2);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of retake2: {}", retake2);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
@@ -155,7 +141,8 @@ pub async fn insert_assessment(
     let rows_affected = database_utils::insert_assessment(&pool, &assessment).await?;
 
     let response = format!("Inserted {} rows", rows_affected);
-    ctx.say(response).await?;
+    ctx.send(|m| m.content(response).ephemeral(true)).await?;
+
     Ok(())
 }
 
@@ -197,19 +184,7 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
         return Ok(());
     }
 
-    let range = utils::calculate_range(page, utils::COURSES_PER_PAGE, courses.len());
-    let courses_table = utils::build_courses_table(courses[range].to_vec());
-
-    // If there are less than 5 courses, don't add page number
-    let content = match courses.len() <= utils::COURSES_PER_PAGE {
-        true => format!("# Courses list\n{}", courses_table),
-        false => format!(
-            "# Courses list (Page {}/{})\n{}",
-            page,
-            (courses.len() / utils::COURSES_PER_PAGE) + 1,
-            courses_table
-        ),
-    };
+    let content = utils::format_course_response(&courses, page)?;
 
     // If there are less than 5 courses, just send it
     if courses.len() <= utils::COURSES_PER_PAGE {
@@ -234,40 +209,46 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
 #[poise::command(
     slash_command,
     default_member_permissions = "SEND_MESSAGES",
-    user_cooldown = "30"
+    user_cooldown = "5"
 )]
 pub async fn list_assessments(
     ctx: Context<'_>,
-    course_id: i32,
+    course_id: i64,
     page: Option<usize>,
 ) -> Result<(), Error> {
     let connection = database_utils::establish_connection().await?;
     let assessments = database_utils::get_course_assessments(&connection, course_id).await?;
+    let courses = database_utils::get_all_courses(&connection).await?;
 
     let page = page.unwrap_or(1);
-    let assessments_per_page = 5;
 
-    if page > (assessments.len() / assessments_per_page) + 1 {
+    if page > (assessments.len() / utils::ASSESSMENTS_PER_PAGE) + 1 {
         let response = format!("Page {} does not exist", page);
         ctx.say(response).await?;
         return Ok(());
     }
 
-    let range = utils::calculate_range(page, assessments_per_page, assessments.len());
-    let assessments_table = utils::build_assessments_table(assessments[range].to_vec());
-
-    let content = match assessments.len() <= assessments_per_page {
-        true => format!("# Assessments list\n{}", assessments_table),
-        false => format!(
-            "# Assessments list (Page {}/{})\n{}",
-            page,
-            (assessments.len() / assessments_per_page) + 1,
-            assessments_table
-        ),
+    let course_name =  match courses.iter().find(|course| course.id == course_id) {
+        Some(course) => course.name.clone(),
+        None => "No course selected".to_string(),
     };
 
-    if assessments.len() <= assessments_per_page {
-        ctx.say(content).await?;
+    let mut content = utils::format_assessment_response(&assessments, page, &course_name)?;
+
+    let select_menu = match utils::create_courses_select_menu(&courses, course_id) {
+        Ok(menu) => menu,
+        Err(e) => {
+            content = format!("Error creating select menu: Course not found. Please select a course from the list below.");
+            e
+        }
+    };
+
+    if assessments.len() <= utils::ASSESSMENTS_PER_PAGE {
+        ctx.send(|m| {
+            m.content(content)
+                .components(|c| c.add_action_row(select_menu))
+        })
+        .await?;
         return Ok(());
     }
 
