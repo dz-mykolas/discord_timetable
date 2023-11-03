@@ -12,7 +12,7 @@ pub struct Course {
     pub credit: f64,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct Assessment {
     pub id: i64,
     pub name: String,
@@ -40,6 +40,21 @@ pub async fn get_all_courses(pool: &SqlitePool) -> Result<Vec<Course>, sqlx::Err
     Ok(courses)
 }
 
+pub async fn get_course(pool: &SqlitePool, id: i32) -> Result<Option<Course>, sqlx::Error> {
+    let course: Option<Course> = sqlx::query_as!(
+        Course,
+        r#"
+        SELECT * FROM courses
+        WHERE id = ?
+        "#,
+        id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(course)
+}
+
 pub async fn insert_course(pool: &SqlitePool, course: &Course) -> Result<u64, sqlx::Error> {
     let rows_affected = sqlx::query!(
         r#"
@@ -59,6 +74,17 @@ pub async fn insert_course(pool: &SqlitePool, course: &Course) -> Result<u64, sq
 }
 
 pub async fn delete_course(pool: &SqlitePool, id: i32) -> Result<Option<Course>, sqlx::Error> {
+    // Delete all assessments associated with the course
+    sqlx::query!(
+        r#"
+        DELETE FROM assessments
+        WHERE fk_course_id = ?
+        "#,
+        id
+    )
+    .execute(pool)
+    .await?;
+
     let course: Option<Course> = sqlx::query_as!(
         Course,
         r#"
@@ -84,7 +110,7 @@ pub async fn get_all_assessments(pool: &SqlitePool) -> Result<Vec<Assessment>, s
 
 pub async fn get_course_assessments(
     pool: &SqlitePool,
-    fk_course_id: i32,
+    fk_course_id: i64,
 ) -> Result<Vec<Assessment>, sqlx::Error> {
     let assessments =
         sqlx::query_as::<_, Assessment>("SELECT * FROM assessments WHERE fk_course_id = ?")

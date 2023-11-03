@@ -1,5 +1,3 @@
-use poise::serenity_prelude as serenity;
-
 use std::result::Result;
 
 use chrono::NaiveDate;
@@ -11,63 +9,7 @@ pub struct Data {} // User data, which is stored and accessible in all command i
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-#[poise::command(slash_command, prefix_command)]
-pub async fn write_table(ctx: Context<'_>) -> Result<(), Error> {
-    let _pool = database_utils::establish_connection().await?;
-
-    // stop execution for 1sec
-    std::thread::sleep(std::time::Duration::from_secs(1));
-
-    let take1 = "\u{001b}[0;31m2021-01-01\u{001b}[0;0m";
-    let retake1 = "\u{001b}[0;32m2021-01-02\u{001b}[0;0m";
-    let retake2 = "\u{001b}[0;32m2021-01-03\u{001b}[0;0m";
-
-    let mut table = String::new();
-    table.push_str("# Test hehe\n");
-    table.push_str("```ansi\n");
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str("| Type   | Take 1     | Retake 1   | Retake 2   |\n");
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str(&format!(
-        "| Lab 0  | {:<10} | {:<10} | {:<10} |\n",
-        take1, retake1, retake2
-    ));
-    table.push_str("+--------+------------+------------+------------+\n");
-    table.push_str("```");
-
-    let response = table;
-    ctx.say(response).await?;
-    Ok(())
-}
-
-#[poise::command(slash_command, prefix_command)]
-pub async fn courses(ctx: Context<'_>) -> Result<(), Error> {
-    let pool = database_utils::establish_connection().await?;
-    let courses = database_utils::get_all_courses(&pool).await?;
-
-    let response = utils::build_courses_table(courses);
-
-    ctx.say(response).await?;
-    Ok(())
-}
-
-/// Displays your or another user's account creation date
-#[poise::command(slash_command, prefix_command)]
-pub async fn age(
-    ctx: Context<'_>,
-    #[description = "Selected user"] user: Option<serenity::User>,
-) -> Result<(), Error> {
-    let u = user.as_ref().unwrap_or_else(|| ctx.author());
-    let response = format!(
-        "```ansi\n\u{001b}[0;31m{}'s\u{001b}[0;0m account was created at {}```",
-        u.name,
-        u.created_at()
-    );
-    ctx.say(response).await?;
-    Ok(())
-}
-
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn insert_course(
     ctx: Context<'_>,
 
@@ -113,7 +55,7 @@ pub async fn insert_course(
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn remove_course(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     let pool = database_utils::establish_connection().await?;
     let course = database_utils::delete_course(&pool, id).await?;
@@ -132,7 +74,7 @@ pub async fn remove_course(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn insert_assessment(
     ctx: Context<'_>,
 
@@ -165,27 +107,24 @@ pub async fn insert_assessment(
     match NaiveDate::parse_from_str(&take1, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", take1);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of take1: {}", take1);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
     match NaiveDate::parse_from_str(&retake1, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", retake1);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of retake1: {}", retake1);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
     match NaiveDate::parse_from_str(&retake2, "%Y-%m-%d") {
         Ok(_) => {}
         Err(_) => {
-            let response = format!("Invalid date format: {}", retake2);
-            ctx.say(response).await?;
-            return Ok(());
+            let response = format!("Warning, invalid date format of retake2: {}", retake2);
+            ctx.send(|m| m.content(response).ephemeral(true)).await?;
         }
     }
 
@@ -202,11 +141,12 @@ pub async fn insert_assessment(
     let rows_affected = database_utils::insert_assessment(&pool, &assessment).await?;
 
     let response = format!("Inserted {} rows", rows_affected);
-    ctx.say(response).await?;
+    ctx.send(|m| m.content(response).ephemeral(true)).await?;
+
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command)]
+#[poise::command(slash_command, default_member_permissions = "ADMINISTRATOR")]
 pub async fn remove_assessment(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     let pool = database_utils::establish_connection().await?;
     let assessment = database_utils::delete_assessment(&pool, id).await?;
@@ -228,149 +168,89 @@ pub async fn remove_assessment(ctx: Context<'_>, id: i32) -> Result<(), Error> {
     Ok(())
 }
 
-use serenity::builder::CreateButton;
-use serenity::futures::StreamExt;
-use serenity::model::application::component::ButtonStyle;
-use serenity::model::application::interaction::{
-    InteractionResponseType,
-    MessageFlags
-};
-use std::time::Duration;
-
-#[poise::command(slash_command)]
+#[poise::command(
+    slash_command,
+    default_member_permissions = "SEND_MESSAGES",
+    user_cooldown = "5"
+)]
 pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), Error> {
     let connection = database_utils::establish_connection().await?;
     let courses = database_utils::get_all_courses(&connection).await?;
+    let page = page.unwrap_or(1);
 
-    let mut page = page.unwrap_or(1);
-    let courses_per_page = 5;
-
-    if page > (courses.len() / courses_per_page) + 1 {
+    if page > (courses.len() / utils::COURSES_PER_PAGE) + 1 {
         let response = format!("Page {} does not exist", page);
         ctx.say(response).await?;
         return Ok(());
     }
 
-    let range = utils::calculate_range(page, courses_per_page, courses.len());
-    let courses_table = utils::build_courses_table(courses[range].to_vec());
+    let content = utils::format_course_response(&courses, page)?;
 
-    let content = match courses.len() <= courses_per_page {
-        true => format!("# Courses list\n{}", courses_table),
-        false => format!(
-            "# Courses list (Page {}/{})\n{}",
-            page,
-            (courses.len() / courses_per_page) + 1,
-            courses_table
-        ),
-    };
-
-    if courses.len() <= courses_per_page {
+    // If there are less than 5 courses, just send it
+    if courses.len() <= utils::COURSES_PER_PAGE {
         ctx.say(content).await?;
         return Ok(());
     }
 
-    let previous_button = CreateButton::default()
-        .style(ButtonStyle::Primary)
-        .label("Previous")
-        .custom_id("previous_page")
-        .disabled(page == 1)
-        .to_owned();
+    // Adding buttons
+    let (previous_button, next_button) =
+        utils::create_buttons(page, courses.len() / utils::COURSES_PER_PAGE);
 
-    let next_button = CreateButton::default()
-        .style(ButtonStyle::Primary)
-        .label("Next")
-        .custom_id("next_page")
-        .disabled(false)
-        .to_owned();
-
-    let response: poise::ReplyHandle<'_> = ctx
-        .send(|m| {
-            m.content(content).components(|c| {
-                c.create_action_row(|row| {
-                    row.add_button(previous_button.clone())
-                        .add_button(next_button.clone())
-                })
-            })
+    ctx.send(|m| {
+        m.content(content).components(|c| {
+            c.create_action_row(|row| row.add_button(previous_button).add_button(next_button))
         })
-        .await?;
+    })
+    .await?;
 
-    let m = response.message().await?;
+    Ok(())
+}
 
-    // Wait for multiple interactions
-    let mut interaction_stream = m
-        .await_component_interactions(&ctx)
-        .timeout(Duration::from_secs(10 * 2))
-        .build();
+#[poise::command(
+    slash_command,
+    default_member_permissions = "SEND_MESSAGES",
+    user_cooldown = "5"
+)]
+pub async fn list_assessments(
+    ctx: Context<'_>,
+    course_id: i64,
+    page: Option<usize>,
+) -> Result<(), Error> {
+    let connection = database_utils::establish_connection().await?;
+    let assessments = database_utils::get_course_assessments(&connection, course_id).await?;
+    let courses = database_utils::get_all_courses(&connection).await?;
 
-    while let Some(interaction) = interaction_stream.next().await {
-        if interaction.user.id != ctx.author().id {
-            interaction
-                .create_interaction_response(&ctx, |r| {
-                    r.kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|d| {
-                            d.content("This is not your interaction!")
-                                .flags(MessageFlags::EPHEMERAL)
-                        })
-                })
-                .await?;
+    let page = page.unwrap_or(1);
 
-            continue;
-        }
-
-        let custom_id = interaction.data.custom_id.as_str();
-        let new_page = match custom_id {
-            "previous_page" => page - 1,
-            "next_page" => page + 1,
-            _ => page,
-        };
-        page = new_page;
-        let total_pages = (courses.len() / courses_per_page) + 1;
-        if new_page > total_pages {
-            continue;
-        }
-
-        let range = utils::calculate_range(new_page, courses_per_page, courses.len());
-        let courses_table = utils::build_courses_table(courses[range].to_vec());
-
-        let content = match courses.len() <= courses_per_page {
-            true => format!("# Courses list\n{}", courses_table),
-            false => format!(
-                "# Courses list (Page {}/{})\n{}",
-                new_page, total_pages, courses_table
-            ),
-        };
-
-        let mut previous_button = previous_button.clone();
-        let mut next_button = next_button.clone();
-
-        if new_page > 1 {
-            previous_button.disabled(false);
-        } else {
-            previous_button.disabled(true);
-        }
-
-        if new_page < total_pages {
-            next_button.disabled(false);
-        } else {
-            next_button.disabled(true);
-        }
-
-        interaction
-            .create_interaction_response(&ctx, |r| {
-                r.kind(InteractionResponseType::UpdateMessage)
-                    .interaction_response_data(|d| {
-                        d.content(content).components(|c| {
-                            c.create_action_row(|row| {
-                                row.add_button(previous_button.clone())
-                                    .add_button(next_button.clone())
-                            })
-                        })
-                    })
-            })
-            .await?;
+    if page > (assessments.len() / utils::ASSESSMENTS_PER_PAGE) + 1 {
+        let response = format!("Page {} does not exist", page);
+        ctx.say(response).await?;
+        return Ok(());
     }
 
-    response.edit(ctx, |m| m.components(|c| c)).await?;
+    let course_name =  match courses.iter().find(|course| course.id == course_id) {
+        Some(course) => course.name.clone(),
+        None => "No course selected".to_string(),
+    };
+
+    let mut content = utils::format_assessment_response(&assessments, page, &course_name)?;
+
+    let select_menu = match utils::create_courses_select_menu(&courses, course_id) {
+        Ok(menu) => menu,
+        Err(e) => {
+            content = format!("Error creating select menu: Course not found. Please select a course from the list below.");
+            e
+        }
+    };
+
+    if assessments.len() <= utils::ASSESSMENTS_PER_PAGE {
+        ctx.send(|m| {
+            m.content(content)
+                .components(|c| c.add_action_row(select_menu))
+        })
+        .await?;
+        return Ok(());
+    }
 
     Ok(())
 }
