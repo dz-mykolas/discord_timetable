@@ -2,6 +2,7 @@ use poise::serenity_prelude as serenity;
 use poise::Event;
 
 use std::env;
+use dotenv::dotenv;
 
 mod commands;
 mod database_utils;
@@ -18,8 +19,8 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     // env::set_var("RUST_BACKTRACE", "1");
-    env::set_var("DATABASE_URL", "sqlite:./courses.db");
 
     let options = poise::FrameworkOptions {
         event_handler: |ctx, event, framework, data| {
