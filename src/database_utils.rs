@@ -29,6 +29,7 @@ pub async fn establish_connection() -> Result<SqlitePool> {
         .create_if_missing(true);
 
     let pool = SqlitePool::connect_with(options).await?;
+
     Ok(pool)
 }
 

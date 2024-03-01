@@ -17,3 +17,4 @@ comfy-table = { version = "7", features = ["custom_styling"]}
 console = { version = "0.15" }
 
 chrono = "0.4"
+dotenv = "0.15"

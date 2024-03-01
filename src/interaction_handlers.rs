@@ -28,6 +28,7 @@ pub fn parse_button_page(button_id: &str) -> Result<usize, Error> {
     let button_id = match split_id.next() {
         Some("next_page") => "next_page",
         Some("previous_page") => "previous_page",
+        Some("refresh_page") => "refresh_page",
         _ => return Err("nope".into()),
     };
 
@@ -94,29 +95,35 @@ pub async fn list_courses_handler(
         _ => return Err("Not a button".into()),
     };
 
-    let new_page = parse_button_page(&button_id)?;
-
     let connection = database_utils::establish_connection().await?;
     let courses = database_utils::get_all_courses(&connection).await?;
 
+    let mut new_page = parse_button_page(&button_id)?;
     if new_page > (courses.len() / utils::COURSES_PER_PAGE) + 1 {
-        return Ok(());
+        new_page = 1;
     }
 
     let content = utils::format_course_response(&courses, new_page)?;
 
-    if courses.len() <= utils::COURSES_PER_PAGE {
+    let (previous_button, next_button, refresh_button) =
+        utils::create_buttons(new_page, courses.len() / utils::COURSES_PER_PAGE);
+
+    if courses.is_empty() {
         interaction.as_message_component().unwrap().create_interaction_response(&ctx, |r| {
             r.kind(serenity::model::application::interaction::InteractionResponseType::UpdateMessage)
                 .interaction_response_data(|d| {
-                    d.content(content)
+                    d.content("No courses found").components(|c| {
+                        c.create_action_row(|row| {
+                            row
+                                .add_button(previous_button.clone())
+                                .add_button(next_button.clone())
+                                .add_button(refresh_button.clone())
+                        })
+                    })
                 })
         }).await?;
         return Ok(());
     }
-
-    let (previous_button, next_button) =
-        utils::create_buttons(new_page, courses.len() / utils::COURSES_PER_PAGE);
 
     interaction
         .as_message_component()
@@ -130,6 +137,7 @@ pub async fn list_courses_handler(
                     c.create_action_row(|row| {
                         row.add_button(previous_button.clone())
                             .add_button(next_button.clone())
+                            .add_button(refresh_button.clone())
                     })
                 })
             })
@@ -216,7 +224,7 @@ pub async fn list_assessments_handler(
         return Ok(());
     }
 
-    let (previous_button, next_button) =
+    let (previous_button, next_button, refresh_button) =
         utils::create_buttons(new_page, assessments.len() / utils::ASSESSMENTS_PER_PAGE);
 
     interaction

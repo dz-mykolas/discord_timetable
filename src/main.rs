@@ -1,8 +1,8 @@
 use poise::serenity_prelude as serenity;
 use poise::Event;
 
-use std::env;
 use dotenv::dotenv;
+use std::env;
 
 mod commands;
 mod database_utils;

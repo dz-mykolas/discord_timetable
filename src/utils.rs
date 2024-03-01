@@ -130,7 +130,10 @@ fn add_date_color(date: String) -> String {
     result
 }
 
-pub fn create_buttons(page_num: usize, quotient: usize) -> (CreateButton, CreateButton) {
+pub fn create_buttons(
+    page_num: usize,
+    quotient: usize,
+) -> (CreateButton, CreateButton, CreateButton) {
     let mut previous_button = CreateButton::default()
         .style(ButtonStyle::Primary)
         .label("Previous")
@@ -143,18 +146,27 @@ pub fn create_buttons(page_num: usize, quotient: usize) -> (CreateButton, Create
         .custom_id(format!("next_page;{page_num}"))
         .to_owned();
 
-    if page_num == 1 {
-        previous_button.disabled(true);
-        next_button.disabled(false);
-    } else if page_num == quotient + 1 {
+    let refresh_button = CreateButton::default()
+        .style(ButtonStyle::Primary)
+        .label("↻")
+        .custom_id(format!("refresh_page;{page_num}"))
+        .to_owned();
+
+    if page_num == quotient + 1 {
         previous_button.disabled(false);
         next_button.disabled(true);
+        if page_num == 1 {
+            previous_button.disabled(true);
+        }
+    } else if page_num == 1 {
+        previous_button.disabled(true);
+        next_button.disabled(false);
     } else {
         previous_button.disabled(false);
         next_button.disabled(false);
     }
 
-    (previous_button, next_button)
+    (previous_button, next_button, refresh_button)
 }
 
 pub fn format_assessment_response(

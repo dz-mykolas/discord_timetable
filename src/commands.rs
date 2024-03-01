@@ -193,7 +193,7 @@ pub async fn list_courses(ctx: Context<'_>, page: Option<usize>) -> Result<(), E
     }
 
     // Adding buttons
-    let (previous_button, next_button) =
+    let (previous_button, next_button, refresh_button) =
         utils::create_buttons(page, courses.len() / utils::COURSES_PER_PAGE);
 
     ctx.send(|m| {
@@ -228,7 +228,7 @@ pub async fn list_assessments(
         return Ok(());
     }
 
-    let course_name =  match courses.iter().find(|course| course.id == course_id) {
+    let course_name = match courses.iter().find(|course| course.id == course_id) {
         Some(course) => course.name.clone(),
         None => "No course selected".to_string(),
     };
